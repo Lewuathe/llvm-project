@@ -3,6 +3,10 @@
 // This file tests whether the memref type having non-trivial map layouts
 // are normalized to trivial (identity) layouts.
 
+// CHECK-DAG: #[[$REDUCE_MAP1:.*]] = affine_map<(d0, d1) -> ((d0 mod 2) * 2 + d1 mod 2 + (d0 floordiv 2) * 4 + (d1 floordiv 2) * 8)>
+// CHECK-DAG: #[[$REDUCE_MAP2:.*]] = affine_map<(d0, d1) -> (d0 mod 2 + (d1 mod 2) * 2 + (d0 floordiv 2) * 8 + (d1 floordiv 2) * 4)>
+// CHECK-DAG: #[[$REDUCE_MAP3:.*]] = affine_map<(d0, d1) -> (d0 * 4 + d1)>
+
 // CHECK-LABEL: func @permute()
 func.func @permute() {
   %A = memref.alloc() : memref<64x256xf32, affine_map<(d0, d1) -> (d1, d0)>>
@@ -380,13 +384,13 @@ func.func @memref_load_with_reduction_map(%arg0 :  memref<4x4xf32,#map2>) -> () 
   affine.for %i = 0 to 4 {
     affine.for %j = 0 to 8 {
       affine.for %k = 0 to 8 {
-        // CHECK: %[[INDEX0:.*]] = affine.apply #map{{.*}}(%{{.*}}, %{{.*}})
+        // CHECK: %[[INDEX0:.*]] = affine.apply #[[$REDUCE_MAP1]](%{{.*}}, %{{.*}})
         // CHECK: memref.load %alloc[%[[INDEX0]]] : memref<32xf32>
         %a = memref.load %0[%i, %k] : memref<4x8xf32,#map0>
-        // CHECK: %[[INDEX1:.*]] = affine.apply #map{{.*}}(%{{.*}}, %{{.*}})
+        // CHECK: %[[INDEX1:.*]] = affine.apply #[[$REDUCE_MAP2]](%{{.*}}, %{{.*}})
         // CHECK: memref.load %alloc_0[%[[INDEX1]]] : memref<32xf32>
         %b = memref.load %1[%k, %j] :memref<8x4xf32,#map1>
-        // CHECK: %[[INDEX2:.*]] = affine.apply #map{{.*}}(%{{.*}}, %{{.*}})
+        // CHECK: %[[INDEX2:.*]] = affine.apply #[[$REDUCE_MAP3]](%{{.*}}, %{{.*}})
         // CHECK: memref.load %alloc_1[%[[INDEX2]]] : memref<16xf32>
         %c = memref.load %2[%i, %j] : memref<4x4xf32,#map2>
         %3 = arith.mulf %a, %b : f32
